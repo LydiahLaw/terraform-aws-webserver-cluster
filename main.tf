@@ -2,6 +2,10 @@ provider "aws" {
   region = "eu-central-1"
 }
 
+locals {
+  instance_type = var.environment == "production" ? "t2.medium" : "t2.micro"
+}
+
 data "aws_vpc" "default" {
   default = true
 }
@@ -52,7 +56,7 @@ resource "aws_security_group" "alb_sg" {
 resource "aws_launch_template" "web" {
   name_prefix            = "${var.cluster_name}-"
   image_id               = "ami-0cebfb1f908092578"
-  instance_type          = var.instance_type
+  instance_type          = local.instance_type
   vpc_security_group_ids = [aws_security_group.instance_sg.id]
 
   user_data = base64encode(<<-EOF
@@ -61,7 +65,7 @@ resource "aws_launch_template" "web" {
               apt-get install -y apache2
               systemctl start apache2
               systemctl enable apache2
-              echo "<h1>Hello from ${var.cluster_name}</h1>" > /var/www/html/index.html
+              echo "<h1>Hello from ${var.cluster_name} this is day 10</h1>" > /var/www/html/index.html
               EOF
   )
 }
@@ -82,6 +86,11 @@ resource "aws_autoscaling_group" "web" {
   tag {
     key                 = "Name"
     value               = "${var.cluster_name}-instance"
+    propagate_at_launch = true
+  }
+  tag {
+    key                 = "ManagedBy"
+    value               = var.custom_tag
     propagate_at_launch = true
   }
 }
@@ -119,4 +128,21 @@ resource "aws_lb_listener" "http" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.web.arn
   }
+}
+resource "aws_autoscaling_policy" "scale_out" {
+  count                  = var.enable_autoscaling ? 1 : 0
+  name                   = "${var.cluster_name}-scale-out"
+  autoscaling_group_name = aws_autoscaling_group.web.name
+  adjustment_type        = "ChangeInCapacity"
+  scaling_adjustment     = 1
+  cooldown               = 300
+}
+
+resource "aws_autoscaling_policy" "scale_in" {
+  count                  = var.enable_autoscaling ? 1 : 0
+  name                   = "${var.cluster_name}-scale-in"
+  autoscaling_group_name = aws_autoscaling_group.web.name
+  adjustment_type        = "ChangeInCapacity"
+  scaling_adjustment     = -1
+  cooldown               = 300
 }

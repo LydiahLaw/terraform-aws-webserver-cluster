@@ -24,3 +24,20 @@ variable "server_port" {
   type        = number
   default     = 8080
 }
+
+variable "custom_tag" {
+  description = "A custom tag to apply to all resources in the cluster"
+  type        = string
+  default     = "terraform-module"
+}
+variable "enable_autoscaling" {
+  description = "Whether to create an autoscaling policy for the cluster"
+  type        = bool
+  default     = true
+}
+
+variable "environment" {
+  description = "Deployment environment: dev or production"
+  type        = string
+  default     = "dev"
+}
