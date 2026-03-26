@@ -2,7 +2,15 @@
 
 A reusable Terraform module that deploys a web server cluster on AWS. It provisions a launch template, an Auto Scaling Group, an Application Load Balancer, target group, listener, and the security groups needed to wire them together. Deploys into the default VPC in eu-central-1.
 
----
+## Requirements
+
+| Name | Version |
+|------|---------|
+| Terraform | >= 1.0.0 |
+| AWS Provider | >= 5.0.0 |
+| AWS Region | eu-central-1 (AMI is region-specific) |
+```
+
 
 ## Usage
 ```hcl
@@ -17,7 +25,6 @@ module "webserver_cluster" {
 }
 ```
 
----
 
 ## Inputs
 
@@ -30,7 +37,6 @@ module "webserver_cluster" {
 | server_port | Port the server listens on | number | 8080 | no |
 | custom_tag | Custom tag applied to all cluster resources | string | terraform-module | no |
 
----
 
 ## Outputs
 
@@ -39,7 +45,6 @@ module "webserver_cluster" {
 | alb_dns_name | DNS name of the Application Load Balancer |
 | asg_name | Name of the Auto Scaling Group |
 
----
 
 ## Known limitations and gotchas
 
@@ -47,3 +52,4 @@ module "webserver_cluster" {
 - Security group rules use inline blocks — do not mix with standalone `aws_security_group_rule` resources
 - Avoid `depends_on` at the module level — reference specific outputs directly instead
 - Always pin to a version tag using `?ref=vX.X.X` — never reference without a version
+- The AMI (ami-0cebfb1f908092578) is hardcoded for eu-central-1 — update main.tf if deploying to a different region
