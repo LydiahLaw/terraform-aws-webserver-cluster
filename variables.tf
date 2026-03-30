@@ -12,11 +12,13 @@ variable "instance_type" {
 variable "min_size" {
   description = "Minimum number of EC2 instances in the ASG"
   type        = number
+  default     = 1
 }
 
 variable "max_size" {
   description = "Maximum number of EC2 instances in the ASG"
   type        = number
+  default     = 3
 }
 
 variable "server_port" {
