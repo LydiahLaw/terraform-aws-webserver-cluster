@@ -12,3 +12,8 @@ output "autoscaling_policy_arns" {
   description = "Map of autoscaling policy name to ARN"
   value       = { for p in aws_autoscaling_policy.scale_out : p.name => p.arn }
 }
+
+output "cloudwatch_alarm_arn" {
+  description = "ARN of the high CPU alarm, null when monitoring is disabled"
+  value       = local.enable_monitoring ? aws_cloudwatch_metric_alarm.high_cpu[0].arn : null
+}

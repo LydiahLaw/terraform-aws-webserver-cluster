@@ -3,7 +3,12 @@ provider "aws" {
 }
 
 locals {
-  instance_type = var.environment == "production" ? "t2.medium" : "t2.micro"
+  is_production = var.environment == "production"
+
+  instance_type     = local.is_production ? "t2.medium" : "t2.micro"
+  min_size          = local.is_production ? 3 : 1
+  max_size          = local.is_production ? 10 : 3
+  enable_monitoring = local.is_production
 }
 
 data "aws_vpc" "default" {
@@ -15,6 +20,17 @@ data "aws_subnets" "default" {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
   }
+}
+
+data "aws_vpc" "existing" {
+  count = var.use_existing_vpc ? 1 : 0
+  tags = {
+    Name = "existing-vpc"
+  }
+}
+
+locals {
+  vpc_id = var.use_existing_vpc ? data.aws_vpc.existing[0].id : data.aws_vpc.default.id
 }
 
 resource "aws_security_group" "instance_sg" {
@@ -65,7 +81,7 @@ resource "aws_launch_template" "web" {
               apt-get install -y apache2
               systemctl start apache2
               systemctl enable apache2
-              echo "<h1>Hello from ${var.cluster_name} this is day 10</h1>" > /var/www/html/index.html
+              echo "<h1>Hello from ${var.cluster_name} this is day 11</h1>" > /var/www/html/index.html
               EOF
   )
 }
@@ -75,9 +91,10 @@ resource "aws_autoscaling_group" "web" {
   vpc_zone_identifier = data.aws_subnets.default.ids
   target_group_arns   = [aws_lb_target_group.web.arn]
   health_check_type   = "ELB"
-  min_size            = var.min_size
-  max_size            = var.max_size
+  min_size            = local.min_size
+  max_size            = local.max_size
 
+  
   launch_template {
     id      = aws_launch_template.web.id
     version = "$Latest"
@@ -106,7 +123,7 @@ resource "aws_lb_target_group" "web" {
   name     = "${var.cluster_name}-tg"
   port     = var.server_port
   protocol = "HTTP"
-  vpc_id   = data.aws_vpc.default.id
+  vpc_id   = local.vpc_id
 
   health_check {
     path                = "/"
@@ -145,4 +162,22 @@ resource "aws_autoscaling_policy" "scale_in" {
   adjustment_type        = "ChangeInCapacity"
   scaling_adjustment     = -1
   cooldown               = 300
+}
+
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  count = local.enable_monitoring ? 1 : 0
+
+  alarm_name          = "${var.cluster_name}-high-cpu"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 120
+  statistic           = "Average"
+  threshold           = 80
+  alarm_description   = "CPU utilization exceeded 80%"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.web.name
+  }
 }

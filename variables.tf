@@ -37,7 +37,24 @@ variable "enable_autoscaling" {
 }
 
 variable "environment" {
-  description = "Deployment environment: dev or production"
+  description = "Deployment environment: dev, staging, or production"
   type        = string
   default     = "dev"
+
+  validation {
+    condition     = contains(["dev", "staging", "production"], var.environment)
+    error_message = "Environment must be dev, staging, or production."
+  }
+}
+
+variable "enable_detailed_monitoring" {
+  description = "Enable CloudWatch detailed monitoring alarm (incurs additional cost)"
+  type        = bool
+  default     = false
+}
+
+variable "use_existing_vpc" {
+  description = "Whether to use an existing VPC instead of the default one"
+  type        = bool
+  default     = false
 }
