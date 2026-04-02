@@ -77,6 +77,7 @@ resource "aws_launch_template" "web" {
 
   user_data = base64encode(<<-EOF
               #!/bin/bash
+              # version: 2
               apt-get update -y
               apt-get install -y apache2
               systemctl start apache2
