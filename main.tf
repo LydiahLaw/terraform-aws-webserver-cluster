@@ -93,7 +93,7 @@ resource "aws_launch_template" "web" {
 resource "aws_autoscaling_group" "web" {
   name_prefix         = "${var.cluster_name}-"
   vpc_zone_identifier = data.aws_subnets.default.ids
-  target_group_arns   = [aws_lb_target_group.web.arn]
+  target_group_arns   = [aws_lb_target_group.web.arn, aws_lb_target_group.blue.arn, aws_lb_target_group.green.arn]
   health_check_type   = "ELB"
   min_size            = local.min_size
   max_size            = local.max_size
