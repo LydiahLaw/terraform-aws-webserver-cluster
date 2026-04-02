@@ -17,3 +17,13 @@ output "cloudwatch_alarm_arn" {
   description = "ARN of the high CPU alarm, null when monitoring is disabled"
   value       = local.enable_monitoring ? aws_cloudwatch_metric_alarm.high_cpu[0].arn : null
 }
+
+output "blue_target_group_arn" {
+  description = "ARN of the blue target group"
+  value       = aws_lb_target_group.blue.arn
+}
+
+output "green_target_group_arn" {
+  description = "ARN of the green target group"
+  value       = aws_lb_target_group.green.arn
+}

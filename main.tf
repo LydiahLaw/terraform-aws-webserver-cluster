@@ -81,23 +81,30 @@ resource "aws_launch_template" "web" {
               apt-get install -y apache2
               systemctl start apache2
               systemctl enable apache2
-              echo "<h1>Hello from ${var.cluster_name} this is day 11</h1>" > /var/www/html/index.html
+              echo "<h1>Hello from ${var.cluster_name} - v1</h1>" > /var/www/html/index.html
               EOF
   )
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_autoscaling_group" "web" {
-  name                = "${var.cluster_name}-asg"
+  name_prefix         = "${var.cluster_name}-"
   vpc_zone_identifier = data.aws_subnets.default.ids
   target_group_arns   = [aws_lb_target_group.web.arn]
   health_check_type   = "ELB"
   min_size            = local.min_size
   max_size            = local.max_size
 
-  
   launch_template {
     id      = aws_launch_template.web.id
     version = "$Latest"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 
   tag {
@@ -179,5 +186,55 @@ resource "aws_cloudwatch_metric_alarm" "high_cpu" {
 
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.web.name
+  }
+}
+
+resource "aws_lb_target_group" "blue" {
+  name     = "${var.cluster_name}-blue-tg"
+  port     = var.server_port
+  protocol = "HTTP"
+  vpc_id   = local.vpc_id
+
+  health_check {
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200"
+    interval            = 15
+    timeout             = 3
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
+resource "aws_lb_target_group" "green" {
+  name     = "${var.cluster_name}-green-tg"
+  port     = var.server_port
+  protocol = "HTTP"
+  vpc_id   = local.vpc_id
+
+  health_check {
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200"
+    interval            = 15
+    timeout             = 3
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
+resource "aws_lb_listener_rule" "blue_green" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = var.active_environment == "blue" ? aws_lb_target_group.blue.arn : aws_lb_target_group.green.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/*"]
+    }
   }
 }

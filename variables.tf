@@ -60,3 +60,13 @@ variable "use_existing_vpc" {
   type        = bool
   default     = false
 }
+variable "active_environment" {
+  description = "Which environment is currently active for blue/green routing: blue or green"
+  type        = string
+  default     = "blue"
+
+  validation {
+    condition     = contains(["blue", "green"], var.active_environment)
+    error_message = "active_environment must be blue or green."
+  }
+}
