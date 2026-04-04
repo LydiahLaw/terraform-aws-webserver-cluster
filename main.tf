@@ -6,7 +6,7 @@ locals {
   is_production = var.environment == "production"
 
   instance_type     = local.is_production ? "t2.medium" : "t2.micro"
-  min_size          = local.is_production ? 3 : 1
+  min_size          = local.is_production ? 3 : 2
   max_size          = local.is_production ? 10 : 3
   enable_monitoring = local.is_production
 }
@@ -82,7 +82,7 @@ resource "aws_launch_template" "web" {
               apt-get install -y apache2
               systemctl start apache2
               systemctl enable apache2
-              echo "<h1>Hello from ${var.cluster_name} - v2</h1>" > /var/www/html/index.html
+              echo "<h1>Hello from ${var.cluster_name} - v1</h1>" > /var/www/html/index.html
               EOF
   )
 
