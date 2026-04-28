@@ -7,6 +7,11 @@ variable "instance_type" {
   description = "EC2 instance type for the cluster"
   type        = string
   default     = "t2.micro"
+
+  validation {
+    condition     = can(regex("^t[23]\\.", var.instance_type))
+    error_message = "Instance type must be a t2 or t3 family type."
+  }
 }
 
 variable "min_size" {

@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 provider "aws" {
   region = "eu-central-1"
 }
@@ -10,9 +19,26 @@ locals {
   max_size          = local.is_production ? 10 : 3
   enable_monitoring = local.is_production
 }
+locals {
+  common_tags = {
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    Project     = var.cluster_name
+  }
+}
 
 data "aws_vpc" "default" {
   default = true
+}
+data "aws_ami" "ubuntu" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  owners = ["099720109477"]
 }
 
 data "aws_subnets" "default" {
@@ -37,10 +63,10 @@ resource "aws_security_group" "instance_sg" {
   name = "${var.cluster_name}-instance-sg"
 
   ingress {
-    from_port   = var.server_port
-    to_port     = var.server_port
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = var.server_port
+    to_port         = var.server_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   egress {
@@ -49,6 +75,11 @@ resource "aws_security_group" "instance_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = merge(local.common_tags, {
+  Name = "${var.cluster_name}-instance-sg"
+})
+
 }
 
 resource "aws_security_group" "alb_sg" {
@@ -67,11 +98,15 @@ resource "aws_security_group" "alb_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = merge(local.common_tags, {
+  Name = "${var.cluster_name}-alb-sg"
+})
 }
 
 resource "aws_launch_template" "web" {
   name_prefix            = "${var.cluster_name}-"
-  image_id               = "ami-0cebfb1f908092578"
+  image_id               = data.aws_ami.ubuntu.id
   instance_type          = local.instance_type
   vpc_security_group_ids = [aws_security_group.instance_sg.id]
 
@@ -86,8 +121,17 @@ resource "aws_launch_template" "web" {
               EOF
   )
 
+  tag_specifications {
+  resource_type = "instance"
+
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_name}-instance"
+  })
+}
+
   lifecycle {
     create_before_destroy = true
+    prevent_destroy       = true
   }
 }
 
@@ -106,6 +150,7 @@ resource "aws_autoscaling_group" "web" {
 
   lifecycle {
     create_before_destroy = true
+    prevent_destroy       = true
   }
 
   tag {
@@ -125,6 +170,14 @@ resource "aws_lb" "web" {
   load_balancer_type = "application"
   subnets            = data.aws_subnets.default.ids
   security_groups    = [aws_security_group.alb_sg.id]
+
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_name}-alb"
+  })
+
+  lifecycle {
+  prevent_destroy = true
+}
 }
 
 resource "aws_lb_target_group" "web" {
@@ -142,6 +195,11 @@ resource "aws_lb_target_group" "web" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
+
+  tags = merge(local.common_tags, {
+  Name = "${var.cluster_name}-tg"
+})
+
 }
 
 resource "aws_lb_listener" "http" {
@@ -172,6 +230,14 @@ resource "aws_autoscaling_policy" "scale_in" {
   cooldown               = 300
 }
 
+resource "aws_sns_topic" "alerts" {
+  name = "${var.cluster_name}-alerts"
+
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_name}-alerts"
+  })
+}
+
 resource "aws_cloudwatch_metric_alarm" "high_cpu" {
   count = local.enable_monitoring ? 1 : 0
 
@@ -188,6 +254,7 @@ resource "aws_cloudwatch_metric_alarm" "high_cpu" {
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.web.name
   }
+  alarm_actions = [aws_sns_topic.alerts.arn]
 }
 
 resource "aws_lb_target_group" "blue" {
@@ -205,6 +272,10 @@ resource "aws_lb_target_group" "blue" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_name}-blue-tg"
+  })
 }
 
 resource "aws_lb_target_group" "green" {
@@ -222,6 +293,10 @@ resource "aws_lb_target_group" "green" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.cluster_name}-green-tg"
+  })
 }
 
 resource "aws_lb_listener_rule" "blue_green" {
