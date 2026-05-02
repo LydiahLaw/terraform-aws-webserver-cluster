@@ -150,7 +150,7 @@ resource "aws_autoscaling_group" "web" {
 
   lifecycle {
     create_before_destroy = true
-    prevent_destroy       = true
+    #prevent_destroy       = true
   }
 
   tag {
@@ -176,7 +176,7 @@ resource "aws_lb" "web" {
   })
 
   lifecycle {
-  prevent_destroy = true
+  #prevent_destroy = true
 }
 }
 
