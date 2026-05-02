@@ -131,7 +131,7 @@ resource "aws_launch_template" "web" {
 
   lifecycle {
     create_before_destroy = true
-    prevent_destroy       = true
+    #prevent_destroy       = true
   }
 }
 
